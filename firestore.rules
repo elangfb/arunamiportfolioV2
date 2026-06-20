@@ -1,0 +1,33 @@
+rules_version = '2';
+
+// Arunami — Firestore security rules.
+//
+// PROTOTYPE POSTURE: any *signed-in* user can read/write. This is safe enough
+// for a closed prototype (no anonymous access) and avoids the uid↔role mapping
+// problem (our user docs are keyed by app id, not the Firebase auth uid).
+//
+// PRODUCTION: assign a custom claim `role` (admin|bapm|investor) to each auth
+// user via the Admin SDK / a Cloud Function, then switch to the role template
+// below for true RBAC.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+
+    match /{collection}/{docId} {
+      allow read, write: if signedIn();
+    }
+
+    // ── Production RBAC template (requires custom claims) ──
+    // function role() { return request.auth.token.role; }
+    // match /users/{id}        { allow read: if signedIn(); allow write: if role() == 'admin'; }
+    // match /companies/{id}    { allow read: if signedIn(); allow write: if role() == 'admin'; }
+    // match /investors/{id}    { allow read: if signedIn(); allow write: if role() == 'admin'; }
+    // match /allocations/{id}  { allow read: if signedIn(); allow write: if role() == 'admin'; }
+    // match /pnl/{id}          { allow read: if signedIn(); allow write: if role() == 'bapm'; }
+    // match /distributions/{id}{ allow read: if signedIn(); allow write: if role() in ['admin','bapm']; }
+    // match /reports/{id}      { allow read: if signedIn(); allow write: if role() in ['bapm','investor']; }
+    // match /documents/{id}    { allow read: if signedIn(); allow write: if role() == 'admin'; }
+    // match /audit/{id}        { allow read: if signedIn(); allow create: if signedIn(); allow update, delete: if false; }
+  }
+}

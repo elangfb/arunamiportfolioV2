@@ -17,8 +17,31 @@ npm run typecheck    # optional: TS check
 
 On the login screen, pick any seeded user to enter as that role. Use **↻ Reset data** (top-right) anytime to restore the demo seed.
 
-### Use real Firebase (optional)
-Copy `.env.example` → `.env.local`, fill your Firebase web config, set `VITE_USE_FIREBASE=true`. Nothing else changes — the store swaps from `MockStore` to `FirestoreStore` behind the same interface. (Demo login still picks a seeded user; wiring real email/password auth is a documented TODO in `src/auth/AuthContext.tsx`.)
+### Connect to Firebase (real backend)
+
+The same screens run on real Firebase — only the store's backend and the auth path swap (`firebaseEnabled` from env decides at runtime). Steps:
+
+**In the Firebase console (one-time):**
+1. Create a project → **Add a Web app** → copy the `firebaseConfig`.
+2. **Authentication** → Sign-in method → enable **Email/Password**.
+3. **Firestore Database** → Create (test mode is fine; rules ship in `firestore.rules`).
+4. *(optional)* **Storage** → enable (only for real file uploads, FB-E).
+
+**In the app:**
+5. `cp .env.example .env.local`, paste your config, set `VITE_USE_FIREBASE=true`.
+6. `npm run dev` → the login screen is now **email/password**. Click **"Seed data + akun demo"** once — it writes the seed into Firestore and creates the demo accounts (password `arunami123`).
+7. Sign in (e.g. `admin@arunami.id` / `arunami123`) and walk the money flow — now Firestore-backed and synced across roles in real time.
+
+**Deploy rules (optional, needs Firebase CLI):**
+```bash
+# set your project id in .firebaserc first
+npm i -g firebase-tools && firebase login
+firebase deploy --only firestore:rules,storage
+# build + host the app:
+npm run build && firebase deploy --only hosting
+```
+
+> Security note: `firestore.rules` ships in **signed-in mode** (any authenticated user can read/write) — fine for a closed prototype. A commented **role-based template** (custom claims) is in the same file for production. See `PROJECT-PLAN.md` §10 for the full Firebase tracker.
 
 ---
 
