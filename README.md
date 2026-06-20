@@ -32,16 +32,27 @@ The same screens run on real Firebase — only the store's backend and the auth 
 6. `npm run dev` → the login screen is now **email/password**. Click **"Seed data + akun demo"** once — it writes the seed into Firestore and creates the demo accounts (password `arunami123`).
 7. Sign in (e.g. `admin@arunami.id` / `arunami123`) and walk the money flow — now Firestore-backed and synced across roles in real time.
 
-**Deploy rules (optional, needs Firebase CLI):**
+**Deploy security (role-based access — needs Blaze plan + Firebase CLI):**
 ```bash
-# set your project id in .firebaserc first
+# 1) set your project id in .firebaserc, enable the Blaze plan
 npm i -g firebase-tools && firebase login
-firebase deploy --only firestore:rules,storage
-# build + host the app:
+# 2) build + deploy Cloud Functions (sets role custom claims) + rules
+cd functions && npm install && cd ..
+firebase deploy --only functions,firestore:rules,storage
+# 3) (optional) build + host the app
 npm run build && firebase deploy --only hosting
 ```
 
-> Security note: `firestore.rules` ships in **signed-in mode** (any authenticated user can read/write) — fine for a closed prototype. A commented **role-based template** (custom claims) is in the same file for production. See `PROJECT-PLAN.md` §10 for the full Firebase tracker.
+**Security model (pilot tier, see `PRODUCTION-PLAN.md`):** roles come from a `role`
+custom claim set by `functions/onUserCreate` (derived from each user's app record).
+`firestore.rules` then **strictly gate writes** by role and make the audit log
+append-only. The seeded admin gets the claim automatically. *Pilot compromise:*
+authenticated users can still *read* operational collections (the client mirrors
+whole collections); per-investor read isolation is tracked as P1.6.
+
+> After deploy, sign out/in once so your refreshed token carries the role claim.
+> Full hardening roadmap (money validation, real KYC, tests, monitoring…) lives in
+> **`PRODUCTION-PLAN.md`**.
 
 ---
 

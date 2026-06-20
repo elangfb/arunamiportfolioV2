@@ -1,33 +1,64 @@
 rules_version = '2';
 
-// Arunami — Firestore security rules.
+// Arunami — Firestore security rules (P1 authorization, pilot tier).
 //
-// PROTOTYPE POSTURE: any *signed-in* user can read/write. This is safe enough
-// for a closed prototype (no anonymous access) and avoids the uid↔role mapping
-// problem (our user docs are keyed by app id, not the Firebase auth uid).
+// Roles come from the `role` custom claim set by functions/onUserCreate.
 //
-// PRODUCTION: assign a custom claim `role` (admin|bapm|investor) to each auth
-// user via the Admin SDK / a Cloud Function, then switch to the role template
-// below for true RBAC.
+// POSTURE (secure pilot):
+//   • WRITES are strictly role-gated — this closes the main risk (an investor
+//     overwriting companies / cap tables / distributions / audit).
+//   • READS on operational collections are allowed for any signed-in user.
+//     This is a deliberate pilot compromise: the client store mirrors whole
+//     collections via onSnapshot, which needs collection-wide read access.
+//     Per-investor READ scoping (so investors can't see each other's numbers)
+//     is tracked as a follow-up — it needs query-scoped reads, not full mirror.
+//   • AUDIT is append-only. REPORTS let investors update only the `reads` field.
 service cloud.firestore {
   match /databases/{database}/documents {
 
     function signedIn() { return request.auth != null; }
+    function role() { return request.auth.token.role; }
+    function isAdmin() { return signedIn() && role() == 'admin'; }
+    function isBapm() { return signedIn() && role() == 'bapm'; }
+    function isInvestor() { return signedIn() && role() == 'investor'; }
 
-    match /{collection}/{docId} {
-      allow read, write: if signedIn();
+    // Identity & PII registries — read by any signed-in (mirror), write admin only.
+    match /users/{id}      { allow read: if signedIn(); allow write: if isAdmin(); }
+    match /investors/{id}  { allow read: if signedIn(); allow write: if isAdmin(); }
+
+    // Company config & allocations — admin-owned.
+    match /companies/{id}    { allow read: if signedIn(); allow write: if isAdmin(); }
+    match /allocations/{id}  { allow read: if signedIn(); allow write: if isAdmin(); }
+    match /documents/{id}    { allow read: if signedIn(); allow write: if isAdmin(); }
+
+    // Financials — authored by BA-PM (admin may correct).
+    match /pnl/{id} { allow read: if signedIn(); allow write: if isBapm() || isAdmin(); }
+
+    // Distributions — admin creates/processes/holds; BA-PM forwards (update).
+    // P2 will move the money calculation server-side (callable), then tighten
+    // these writes to deny client-set amounts.
+    match /distributions/{id} {
+      allow read: if signedIn();
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin() || isBapm();
     }
 
-    // ── Production RBAC template (requires custom claims) ──
-    // function role() { return request.auth.token.role; }
-    // match /users/{id}        { allow read: if signedIn(); allow write: if role() == 'admin'; }
-    // match /companies/{id}    { allow read: if signedIn(); allow write: if role() == 'admin'; }
-    // match /investors/{id}    { allow read: if signedIn(); allow write: if role() == 'admin'; }
-    // match /allocations/{id}  { allow read: if signedIn(); allow write: if role() == 'admin'; }
-    // match /pnl/{id}          { allow read: if signedIn(); allow write: if role() == 'bapm'; }
-    // match /distributions/{id}{ allow read: if signedIn(); allow write: if role() in ['admin','bapm']; }
-    // match /reports/{id}      { allow read: if signedIn(); allow write: if role() in ['bapm','investor']; }
-    // match /documents/{id}    { allow read: if signedIn(); allow write: if role() == 'admin'; }
-    // match /audit/{id}        { allow read: if signedIn(); allow create: if signedIn(); allow update, delete: if false; }
+    // Reports — BA-PM/admin author; investors may update ONLY the `reads` map.
+    match /reports/{id} {
+      allow read: if signedIn();
+      allow create, delete: if isBapm() || isAdmin();
+      allow update: if isBapm() || isAdmin()
+        || (isInvestor() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reads']));
+    }
+
+    // Audit — append-only (no edits/deletes, ever).
+    match /audit/{id} {
+      allow read: if signedIn();
+      allow create: if signedIn();
+      allow update, delete: if false;
+    }
+
+    // Default deny.
+    match /{document=**} { allow read, write: if false; }
   }
 }

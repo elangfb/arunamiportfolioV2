@@ -38,6 +38,7 @@
 | **M2 — Important** (AI extraction, real PDF, lifetime reports, notifications) | Phase 2 | ⏸ Deferred (flagged off in `config/features.ts`) |
 | **M3 — Nice-to-have** (benchmarking, meeting mode, custom categories, …) | Phase 3 | ⏸ Deferred |
 | **M-FB — Firebase integration** (Auth + Firestore + rules) | cross-cutting | 🔄 Code done — awaiting your console steps (FB-A, F2) |
+| **M-PROD — Production hardening** | see `PRODUCTION-PLAN.md` | 🔄 In progress (P0 started) |
 
 ---
 

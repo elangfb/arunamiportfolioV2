@@ -9,6 +9,9 @@ import { makeSeed } from '../data/seed'
 export const DEMO_PASSWORD = 'arunami123'
 
 export async function seedFirebase(): Promise<string> {
+  // Hard guard: seeding overwrites Firestore via store.reset(). NEVER allow it
+  // in a production build — only during local `vite dev`.
+  if (!import.meta.env.DEV) throw new Error('Seeding dinonaktifkan di build produksi')
   if (!auth) throw new Error('Firebase tidak aktif (set VITE_USE_FIREBASE=true)')
   // 1) Firestore data (store.reset() batch-writes the seed in Firebase mode)
   await store.reset()

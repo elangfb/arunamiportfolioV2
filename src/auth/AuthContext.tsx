@@ -40,7 +40,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(u)
         setAuthedNoProfile(!u)
       }
-      const unsubAuth = onAuthStateChanged(auth, (fb) => { emailRef.current = fb?.email ?? null; recompute() })
+      const unsubAuth = onAuthStateChanged(auth, async (fb) => {
+        // Force a token refresh so role custom claims (set server-side by
+        // functions/onUserCreate) are present for Firestore rules.
+        if (fb) { try { await fb.getIdToken(true) } catch { /* ignore */ } }
+        emailRef.current = fb?.email ?? null
+        recompute()
+      })
       const unsubStore = store.subscribe(recompute)
       return () => { unsubAuth(); unsubStore() }
     }

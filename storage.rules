@@ -1,11 +1,22 @@
 rules_version = '2';
 
-// Arunami — Storage rules (for FB-E file uploads: proofs, KYC docs).
-// Prototype: signed-in users only. Tighten per-path in production.
+// Arunami — Storage rules (role-based, for FB-E/P4 uploads).
+// proofs: admin writes (transfer proofs), any signed-in reads.
+// kyc:    admin writes, admin/bapm read (PII).
 service firebase.storage {
   match /b/{bucket}/o {
-    match /{allPaths=**} {
-      allow read, write: if request.auth != null;
+    function role() { return request.auth.token.role; }
+    function signedIn() { return request.auth != null; }
+
+    match /proofs/{file=**} {
+      allow read: if signedIn();
+      allow write: if signedIn() && role() == 'admin';
     }
+    match /kyc/{file=**} {
+      allow read: if signedIn() && (role() == 'admin' || role() == 'bapm');
+      allow write: if signedIn() && role() == 'admin';
+    }
+    // Default deny.
+    match /{allPaths=**} { allow read, write: if false; }
   }
 }

@@ -83,9 +83,10 @@ function FirebaseLogin() {
         {authedNoProfile && <p className="text-xs text-warn">Akun terautentikasi tapi belum ada data. Jalankan "Seed data + akun" di bawah.</p>}
       </div>
 
+      {import.meta.env.DEV && (
       <div className="card">
-        <div className="text-sm font-semibold text-ink mb-1">Setup pertama kali</div>
-        <p className="text-xs text-ink-soft mb-3">Tulis data demo ke Firestore &amp; buat akun demo (password: <code>{DEMO_PASSWORD}</code>). Aman dijalankan ulang.</p>
+        <div className="text-sm font-semibold text-ink mb-1">Setup pertama kali <span className="text-warn font-normal">(dev only)</span></div>
+        <p className="text-xs text-ink-soft mb-3">Tulis data demo ke Firestore &amp; buat akun demo (password: <code>{DEMO_PASSWORD}</code>). Aman dijalankan ulang. Tombol ini tidak muncul di build produksi.</p>
         <Button className="w-full justify-center" disabled={busy} onClick={seed}>Seed data + akun demo</Button>
         <div className="mt-3 text-[11px] text-ink-faint">
           Akun demo:
@@ -94,6 +95,7 @@ function FirebaseLogin() {
           </ul>
         </div>
       </div>
+      )}
     </div>
   )
 }
