@@ -15,8 +15,10 @@ interface AuthState {
   user: User | null
   mode: 'mock' | 'firebase'
   authedNoProfile: boolean // Firebase sign-in succeeded but no matching app user (needs seed)
+  emailVerified: boolean
   loginAs: (userId: string) => void
   loginWithEmail: (email: string, pw: string) => Promise<void>
+  resendVerification: () => Promise<void>
   logout: () => void
 }
 
@@ -29,6 +31,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return id ? store.snapshot().users.find((u) => u.id === id) ?? null : null
   })
   const [authedNoProfile, setAuthedNoProfile] = useState(false)
+  const [emailVerified, setEmailVerified] = useState(true)
   const emailRef = useRef<string | null>(null)
 
   useEffect(() => {
@@ -44,6 +47,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Force a token refresh so role custom claims (set server-side by
         // functions/onUserCreate) are present for Firestore rules.
         if (fb) { try { await fb.getIdToken(true) } catch { /* ignore */ } }
+        setEmailVerified(fb ? fb.emailVerified : true)
         emailRef.current = fb?.email ?? null
         recompute()
       })
@@ -60,6 +64,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     user,
     mode: firebaseEnabled ? 'firebase' : 'mock',
     authedNoProfile,
+    emailVerified,
+    resendVerification: async () => {
+      if (auth?.currentUser) {
+        const { sendEmailVerification } = await import('firebase/auth')
+        await sendEmailVerification(auth.currentUser)
+      }
+    },
     loginAs: (userId) => {
       const u = store.snapshot().users.find((x) => x.id === userId) ?? null
       if (u) localStorage.setItem(LS_USER, u.id)
@@ -76,7 +87,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       emailRef.current = null
       setUser(null)
     },
-  }), [user, authedNoProfile])
+  }), [user, authedNoProfile, emailVerified])
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }

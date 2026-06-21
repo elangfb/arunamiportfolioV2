@@ -22,6 +22,7 @@ export const ROLE_CONFIG: Record<Role, RoleConfig> = {
     accent: '#4338CA',
     nav: [
       { to: '/admin', label: 'Dashboard', icon: '◧' },
+      { to: '/admin/users', label: 'Pengguna & akses', icon: '◔' },
       { to: '/admin/companies', label: 'Perusahaan', icon: '▥' },
       { to: '/admin/investors', label: 'Investor & KYC', icon: '◑' },
       { to: '/admin/distributions', label: 'Bagi hasil & transfer', icon: '◈' },

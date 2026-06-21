@@ -8,7 +8,7 @@ import { store } from '../data/store'
 import { Avatar, toast } from './ui'
 
 export default function Layout() {
-  const { user, logout } = useAuth()
+  const { user, logout, mode, emailVerified, resendVerification } = useAuth()
   const loc = useLocation()
   if (!user) return null
   const cfg = ROLE_CONFIG[user.role]
@@ -57,11 +57,22 @@ export default function Layout() {
         <header className="h-13 min-h-[52px] border-b border-gray-200 bg-white px-7 flex items-center gap-3">
           <span className="text-base font-semibold text-ink">{current.label}</span>
           <span className="flex-1" />
-          <button
-            onClick={() => { store.reset(); toast('Data direset ke seed') }}
-            className="text-xs text-ink-soft hover:text-ink px-2.5 py-1.5 rounded-md hover:bg-gray-50"
-            title="Kembalikan data demo ke kondisi awal">↻ Reset data</button>
+          {import.meta.env.DEV && (
+            <button
+              onClick={() => { store.reset(); toast('Data direset ke seed') }}
+              className="text-xs text-ink-soft hover:text-ink px-2.5 py-1.5 rounded-md hover:bg-gray-50"
+              title="Kembalikan data demo ke kondisi awal (dev only)">↻ Reset data</button>
+          )}
         </header>
+        {mode === 'firebase' && !emailVerified && (
+          <div className="bg-amber-50 border-b border-amber-200 text-amber-800 text-sm px-7 py-2 flex items-center gap-3">
+            <span>Email Anda belum diverifikasi.</span>
+            <button className="underline font-medium"
+              onClick={async () => { try { await resendVerification(); toast('Email verifikasi dikirim') } catch { toast('Gagal mengirim email') } }}>
+              Kirim ulang
+            </button>
+          </div>
+        )}
         <main className="flex-1 overflow-y-auto">
           <div className="max-w-6xl mx-auto px-7 py-6">
             <Outlet />

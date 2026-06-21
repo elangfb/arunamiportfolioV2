@@ -2,10 +2,12 @@
 // upload per-investor proof, then report to BA-PM. Status: pending → reported.
 import { useState } from 'react'
 import { useActor, distAmounts } from '../shared'
+import { processDistribution } from '../../lib/money'
+import { uploadFile } from '../../lib/storage'
 import { useCollection } from '../../data/useStore'
 import { store } from '../../data/store'
 import { rpJt, uid } from '../../lib/format'
-import { Avatar, Button, Card, Field, Input, Modal, Pill, Select, StatCard, toast } from '../../components/ui'
+import { Avatar, Button, Card, Field, FileButton, Input, Modal, Pill, Select, StatCard, toast } from '../../components/ui'
 import type { Distribution, DistributionStatus } from '../../data/types'
 
 const STATUS: Record<DistributionStatus, { tone: 'amber' | 'blue' | 'green' | 'red'; label: string }> = {
@@ -118,17 +120,25 @@ function ProcessModal({ distId, onClose, actor }: { distId: string; onClose: () 
   const pnl = useCollection('pnl')
   const calc = distAmounts(dist, company, allocations, pnl)
   const readOnly = dist.status !== 'pending'
-  const [proofs, setProofs] = useState<Record<string, string>>(() => {
-    const init: Record<string, string> = {}
-    calc.rows.forEach((r) => { init[r.investorId] = dist.proofs[r.investorId]?.file ?? `bukti-${company.code}-${dist.period.replace(/\s/g, '')}-${r.investorId}.pdf` })
+  const [proofs, setProofs] = useState<Record<string, { file: string; url?: string }>>(() => {
+    const init: Record<string, { file: string; url?: string }> = {}
+    calc.rows.forEach((r) => { const ex = dist.proofs[r.investorId]; init[r.investorId] = ex?.file ? { file: ex.file, url: ex.url } : { file: '' } })
     return init
   })
 
-  function report() {
-    const map: Distribution['proofs'] = {}
-    calc.rows.forEach((r) => { map[r.investorId] = { file: proofs[r.investorId], forwarded: false } })
-    store.update('distributions', distId, { status: 'reported', proofs: map })
-    store.log({ actor: actor.name, role: 'admin', action: `Memproses bagi hasil ${company.name} ${dist.period} (${rpJt(calc.net)}) — dilaporkan ke BA-PM` })
+  async function uploadProof(investorId: string, file: File) {
+    setProofs((p) => ({ ...p, [investorId]: { file: 'Mengunggah…' } }))
+    try {
+      const res = await uploadFile(`proofs/${company.code}/${dist.period.replace(/\s/g, '')}`, file)
+      setProofs((p) => ({ ...p, [investorId]: { file: res.name, url: res.url } }))
+    } catch (e) { toast((e as Error).message); setProofs((p) => ({ ...p, [investorId]: { file: '' } })) }
+  }
+
+  async function report() {
+    // Amounts are recomputed server-side (Firebase) or locally (mock) by the
+    // money service — caller-supplied amounts are never trusted. We only pass proofs.
+    if (!Object.values(proofs).some((p) => p.url)) { toast('Unggah minimal satu bukti transfer'); return }
+    await processDistribution({ distId, proofs, actor: { name: actor.name, role: 'admin' } })
     toast('Diproses & dilaporkan ke BA-PM'); onClose()
   }
   function hold() { store.update('distributions', distId, { status: 'held' }); store.log({ actor: actor.name, role: 'admin', action: `Menahan bagi hasil ${company.name} ${dist.period}` }); toast('Bagi hasil ditahan'); onClose() }
@@ -146,8 +156,16 @@ function ProcessModal({ distId, onClose, actor }: { distId: string; onClose: () 
                 <td className="py-2"><div className="flex items-center gap-2"><Avatar name={inv?.name ?? '?'} color="#A21CAF" /><span>{inv?.name}<span className="block text-[11px] text-ink-faint">{r.ownershipPct}% milik</span></span></div></td>
                 <td className="py-2 text-right tabular-nums font-medium text-ok">{rpJt(r.amountJt)}</td>
                 <td className="py-2 pl-4">
-                  {readOnly ? <span className="text-xs text-ok">✓ {dist.proofs[r.investorId]?.file ?? '—'}</span>
-                    : <Input value={proofs[r.investorId]} onChange={(e) => setProofs({ ...proofs, [r.investorId]: e.target.value })} className="!text-xs !py-1.5" />}
+                  {readOnly ? (
+                    dist.proofs[r.investorId]?.url
+                      ? <a className="text-xs text-info hover:underline" href={dist.proofs[r.investorId]!.url} target="_blank" rel="noreferrer">✓ {dist.proofs[r.investorId]?.file ?? 'bukti'}</a>
+                      : <span className="text-xs text-ok">✓ {dist.proofs[r.investorId]?.file ?? '—'}</span>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-ink-soft">{proofs[r.investorId]?.file || 'Belum ada'}</span>
+                      <FileButton label="Unggah" onPick={(f) => uploadProof(r.investorId, f)} />
+                    </div>
+                  )}
                 </td>
               </tr>
             )

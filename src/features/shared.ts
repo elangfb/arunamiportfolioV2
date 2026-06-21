@@ -1,7 +1,7 @@
 // Small cross-feature helpers.
 import { useAuth } from '../auth/AuthContext'
 import { useCollection } from '../data/useStore'
-import { computeDistribution, pnlDerived } from '../data/calc'
+import { computeDistribution, ownership, pnlDerived } from '../data/calc'
 import type { Allocation, Company, Distribution, PnL, Role } from '../data/types'
 
 /** The logged-in user as an audit "actor" (name + role). */
@@ -16,10 +16,19 @@ export function useActor(): { name: string; role: Role } {
  */
 export function distAmounts(dist: Distribution, company: Company, allAllocations: Allocation[], allPnl: PnL[]) {
   const allocs = allAllocations.filter((a) => a.companyId === company.id)
+  // Prefer authoritative server-computed amounts once processed (P2).
+  if (dist.amounts) {
+    const rows = allocs.map((a) => ({
+      investorId: a.investorId,
+      nominalJt: a.nominalJt,
+      ownershipPct: Math.round(ownership(a, allocs) * 1000) / 10,
+      amountJt: dist.amounts![a.investorId] ?? 0,
+    }))
+    const net = dist.netJt ?? rows.reduce((s, r) => s + r.amountJt, 0)
+    return { rows, pool: net, fee: 0, social: 0, net }
+  }
   const fin = allPnl.find((p) => p.companyId === company.id && p.period === dist.period)
-  const revenue = fin?.revenue ?? 0
-  const net = fin ? pnlDerived(fin).net : 0
-  return computeDistribution(company.scheme, allocs, { revenue, net })
+  return computeDistribution(company.scheme, allocs, { revenue: fin?.revenue ?? 0, net: fin ? pnlDerived(fin).net : 0 })
 }
 
 export type InvestorDistStatus = 'paid' | 'processing' | 'held'

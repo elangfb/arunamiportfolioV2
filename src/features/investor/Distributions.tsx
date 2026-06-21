@@ -61,9 +61,14 @@ export default function InvestorDistributions() {
             <div><div className="field-label">Periode</div>{proof.dist.period}</div>
             <div><div className="field-label">Jumlah</div><span className="font-semibold text-ok">{rpJt(proof.amountJt)}</span></div>
             <div><div className="field-label">Status</div><Pill tone="green">Berhasil</Pill></div>
-            <div className="col-span-2"><div className="field-label">File bukti</div>{me && proof.dist.proofs[me.id]?.file}</div>
+            <div className="col-span-2"><div className="field-label">File bukti</div>{proof.dist.proofs[me.id]?.file ?? '—'}</div>
           </div>
-          <div className="flex gap-2 mt-5"><Button variant="primary" className="flex-1" onClick={() => setProof(null)}>Tutup</Button></div>
+          <div className="flex gap-2 mt-5">
+            {proof.dist.proofs[me.id]?.url && (
+              <a className="btn-secondary flex-1 justify-center" href={proof.dist.proofs[me.id]!.url} target="_blank" rel="noreferrer">Unduh bukti</a>
+            )}
+            <Button variant="primary" className="flex-1" onClick={() => setProof(null)}>Tutup</Button>
+          </div>
         </Modal>
       )}
     </div>

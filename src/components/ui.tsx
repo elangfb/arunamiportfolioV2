@@ -1,5 +1,5 @@
 // Shared UI primitives. Keep screens short by composing these.
-import { type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from 'react'
+import { useId, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from 'react'
 import clsx from 'clsx'
 import type { HealthLevel } from '../data/types'
 
@@ -91,6 +91,18 @@ export function Select(p: SelectHTMLAttributes<HTMLSelectElement>) {
 }
 export function Textarea(p: TextareaHTMLAttributes<HTMLTextAreaElement>) {
   return <textarea {...p} className={clsx('field-input min-h-[80px]', p.className)} />
+}
+
+/** Styled file picker — calls onPick with the chosen File. */
+export function FileButton({ label, onPick, accept = '.pdf,image/*', disabled }: { label: string; onPick: (file: File) => void; accept?: string; disabled?: boolean }) {
+  const id = useId()
+  return (
+    <>
+      <input id={id} type="file" accept={accept} className="hidden" disabled={disabled}
+        onChange={(e) => { const f = e.target.files?.[0]; if (f) onPick(f); e.target.value = '' }} />
+      <label htmlFor={id} className={clsx('btn-secondary btn-sm cursor-pointer', disabled && 'opacity-50 pointer-events-none')}>{label}</label>
+    </>
+  )
 }
 
 // ── Modal ──────────────────────────────────────────────────────

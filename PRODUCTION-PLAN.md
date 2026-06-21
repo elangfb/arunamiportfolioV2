@@ -19,11 +19,11 @@ Turn the **prototype** into a system safe to put real money and real investors t
 | Area | Today | Target | Status |
 |---|---|---|---|
 | Authorization (RBAC) | any signed-in user = full read/write | per-role, least-privilege, enforced in rules | 🔄 code done — deploy (P1.5) + read-scoping (P1.6) left |
-| Money integrity | computed & written client-side | computed/validated server-side (Functions) | ⬜ (P2 next) |
+| Money integrity | computed & written client-side | computed/validated server-side (Functions) | 🔄 distribution amounts now server-authoritative; cap-table validation + idempotency (P2.2/P2.3) left |
 | Audit log | mutable by anyone | append-only, immutable | 🔄 rules written — deploy left |
-| Auth lifecycle | shared demo password, no verify/reset | verify + reset + MFA, real provisioning | ⬜ |
-| Destructive dev tools | seed/reset button public | dev-only, removed from prod | 🔄 |
-| File storage | filenames only | real Storage uploads + signed URLs | ⬜ |
+| Auth lifecycle | shared demo password, no verify/reset | verify + reset + MFA, real provisioning | 🔄 provisioning + reset + verification done; MFA + token-revoke (P3.3/P3.4) left |
+| Destructive dev tools | seed/reset button public | dev-only, removed from prod | ✅ |
+| File storage | filenames only | real Storage uploads + signed URLs | 🔄 code done — enable Storage + deploy (P4.4) left |
 | KYC / AML | filename + verify button | vendor-integrated identity + screening | ⬜ |
 | Input validation | minimal, client-only | shared schema, enforced client + server + rules | ⬜ |
 | Tests / CI | none | unit (calc), rules, component + CI gate | ⬜ |
@@ -46,10 +46,10 @@ Turn the **prototype** into a system safe to put real money and real investors t
 
 ## 4. Phases (prioritized)
 
-### P0 — Immediate risk reduction (no infra) — 🔄
-- ✅ P0.1 Gate the destructive **seed/reset** action to dev-only — `seedFirebase()` throws unless `import.meta.env.DEV`, and the Login "Setup" card renders only in dev (stripped from prod bundle). Verified typecheck + build.
-- ⬜ P0.2 Audit remaining dev-only affordances (e.g. Layout "↻ Reset data" button) and gate/hide in prod
-- ⬜ P0.3 Confirm no client UI can call `store.reset()` against a prod Firestore
+### P0 — Immediate risk reduction (no infra) — ✅
+- ✅ P0.1 `seedFirebase()` throws unless `import.meta.env.DEV`; Login "Setup" card dev-only (stripped from prod bundle).
+- ✅ P0.2 Layout "↻ Reset data" button gated to dev-only; demo-credential prefill on the login form is also dev-only.
+- ✅ P0.3 No client UI can call `store.reset()` in a prod build (seed + reset both dev-gated).
 
 ### P1 — Authorization & data security (code ✅ → 👤 deploy)
 - ✅ P1.1 `functions/` — `onUserCreate` sets `role` (+ `investorId`) **custom claim** from the user's app record; admin-only `setUserRole` callable. Seeded admin gets the claim automatically.
@@ -60,22 +60,23 @@ Turn the **prototype** into a system safe to put real money and real investors t
 - ⬜ P1.5 👤 **Deploy** (`cd functions && npm i`, then `firebase deploy --only functions,firestore:rules,storage`) + verify with rules unit tests (emulator).
 - ⏸ P1.6 **Follow-up (read scoping):** investors can currently *read* operational collections (pilot compromise — the store mirrors whole collections). True per-investor read isolation needs query-scoped reads + `investorId` claim filtering. Tracked for post-pilot.
 
-### P2 — Server-side money integrity (code → 👤 Blaze deploy)
-- ⬜ P2.1 Move distribution processing to a Cloud Function (recompute split server-side from cap table + P&L; reject client-supplied amounts)
-- ⬜ P2.2 Cap-table writes validated server-side (oversubscription, KYC-verified only)
-- ⬜ P2.3 Idempotency keys for money operations; transactional writes
-- ⬜ P2.4 Clients call Functions for money ops; direct Firestore writes for these denied by rules
+### P2 — Server-side money integrity (code → 👤 Blaze deploy) — 🔄
+- ✅ P2.1 `processDistribution` Cloud Function recomputes the split server-side from cap table + P&L and stores authoritative `amounts`/`netJt`. Client passes only proofs. `lib/money.ts` keeps mock mode identical (recomputes locally, never trusts caller amounts). Functions package builds clean.
+- ⬜ P2.2 Cap-table writes validated server-side (oversubscription, KYC-verified-only) — currently admin-only via rules, no server validation yet.
+- ⬜ P2.3 Idempotency keys + transactional writes for money ops.
+- ✅ P2.4 `firestore.rules` deny clients from writing `amounts`/`netJt` (set only by the function via admin SDK).
 
-### P3 — Auth lifecycle (code → 👤 console)
-- ⬜ P3.1 Remove shared demo password from any prod path; admin-driven user provisioning
-- ⬜ P3.2 Email verification + password reset flows
-- ⬜ P3.3 Optional MFA (TOTP) for admin/bapm
-- ⬜ P3.4 Session/expiry handling; sign-out everywhere
+### P3 — Auth lifecycle (code ✅ → 👤 deploy) — 🔄
+- ✅ P3.1 Admin-driven provisioning: `createUser` + `setUserDisabled` Cloud Functions + Admin **"Pengguna & akses"** page (`lib/userAdmin.ts` dual-mode). New accounts get a password-setup email; **no shared password in prod** (demo prefill is dev-only).
+- ✅ P3.2 Password reset ("Lupa password?") + email-verification banner with resend.
+- ⏸ P3.3 MFA (TOTP) — deferred (needs Identity Platform upgrade).
+- 🔄 P3.4 Sign-out + account enable/disable done. "Sign out everywhere" (refresh-token revoke) deferred.
 
-### P4 — Real file storage (code → 👤 enable Storage)
-- ⬜ P4.1 Upload helper → Cloud Storage; store download URL + metadata (replaces filename strings)
-- ⬜ P4.2 Wire transfer-proof upload (Admin) + KYC docs (Admin) to real Storage
-- ⬜ P4.3 Signed URLs / access via rules; file type + size validation
+### P4 — Real file storage (code ✅ → 👤 enable Storage) — 🔄
+- ✅ P4.1 `lib/storage.ts` upload helper (Firebase Storage → download URL; mock → object URL) + `FileButton` UI + client size/type validation.
+- ✅ P4.2 Transfer-proof upload (Admin process modal) + KYC docs (Admin KYC modal) now use **real uploads**; proof/KYC store `{name,url}`; download links in Admin & Investor views.
+- ✅ P4.3 `storage.rules` enforce role + size (<10MB) + content-type (PDF/image).
+- ⬜ P4.4 👤 Enable Storage + deploy `storage.rules`; verify upload/download live.
 
 ### P5 — KYC / AML (code → 👤 vendor) ⏸ until D-C
 - ⬜ P5.1 Integrate eKYC vendor (identity + liveness)
@@ -122,6 +123,9 @@ Turn the **prototype** into a system safe to put real money and real investors t
 ---
 
 ## 6. Progress log (newest first)
+- **2026-06-20 (6)** — ✅ **P4 done (code):** `lib/storage.ts` real uploads (Firebase Storage / mock object-URL), `FileButton` UI, transfer-proof + KYC-doc uploads wired into Admin, download links for Admin & Investor, `storage.rules` size/type validation. App + functions build clean. Pilot now: P0✅ P1✅ P2🔄 P3🔄 P4🔄 (all code in; awaiting deploy). Next: **P7** (tests/CI) to lock the money math.
+- **2026-06-20 (5)** — ✅ **P0 closed** (reset button + demo prefill now dev-only). 🔄 **P3 done (pilot):** admin user provisioning (`createUser`/`setUserDisabled` functions + Admin "Pengguna & akses" page), password reset, email-verification banner. MFA (P3.3) + token-revoke deferred. App typecheck+build + functions build all pass. Pilot security core (P0–P3) is essentially in code; next is **P4** (real Storage uploads) then **P7** (tests).
+- **2026-06-20 (4)** — 🔄 **P2 core done:** `processDistribution` Cloud Function makes distribution amounts **server-authoritative**; `lib/money.ts` dual-mode (callable vs mock); `Distribution.amounts/netJt` stored; rules deny client-set amounts. App typecheck+build pass; **functions package builds clean** (installed + compiled). Left in P2: cap-table server validation (P2.2) + idempotency (P2.3). Next phase: **P3** (auth lifecycle) per pilot sequence.
 - **2026-06-20 (3)** — Decisions: **pilot tier + Blaze/Functions**. ✅ **P1 code complete** — Cloud Functions custom-claim RBAC (`functions/`), role-based `firestore.rules` (strict writes, default-deny), append-only audit, role-based `storage.rules`, token-refresh in `AuthContext`, `firebase.json` functions wiring. App typecheck + build pass. Left to you: **P1.5 deploy** (see README). Next: **P2** — move money math server-side.
 - **2026-06-20 (2)** — ✅ P0.1 done: seed/reset gated to dev-only (function guard + UI hidden in prod build); typecheck + build pass. Next: D-A…D-D decisions, then P1 (authorization) — the highest-impact phase.
 - **2026-06-20 (1)** — M-PROD created. Baseline = prototype on Firebase (`81ca05d`). Decisions D-A…D-D pending.

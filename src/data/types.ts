@@ -32,6 +32,7 @@ export interface User {
   role: Role
   status: 'active' | 'inactive' | 'pending'
   teamArunami?: boolean      // internal staff — exempt from platform fee
+  uid?: string               // Firebase Auth uid (set server-side when provisioned)
 }
 
 export interface Company {            // a portfolio company
@@ -60,7 +61,7 @@ export interface Investor {
   npwp?: string
   kyc: KycStatus
   joinedAt: string
-  docs?: Partial<Record<'ktp' | 'npwp' | 'bank', string>>  // filename per doc
+  docs?: Partial<Record<'ktp' | 'npwp' | 'bank', { name: string; url: string }>>  // uploaded file per doc
 }
 
 export interface Allocation {         // one cap-table row (investor ↔ company)
@@ -90,8 +91,13 @@ export interface Distribution {
   yieldPct: number                    // realised period yield used for the split
   note?: string
   // per-investor proof + forward state, keyed by investorId
-  proofs: Record<string, { file?: string; forwarded?: boolean }>
+  proofs: Record<string, { file?: string; url?: string; forwarded?: boolean }>
   createdAt: string
+  // Authoritative per-investor amounts, set server-side at processing time
+  // (P2). In Firebase mode rules forbid clients from writing these. In mock
+  // mode the money service fills them locally. Absent = not yet processed.
+  amounts?: Record<string, number>
+  netJt?: number
 }
 
 export interface Report {

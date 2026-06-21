@@ -33,3 +33,4 @@ if (firebaseEnabled) {
 export const auth = _auth
 export const db = _db
 export const storage = _storage
+export const firebaseApp = app

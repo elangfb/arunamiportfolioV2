@@ -9,6 +9,7 @@ import { ROLE_CONFIG } from './config/roles'
 
 // Admin
 import AdminDashboard from './features/admin/Dashboard'
+import Users from './features/admin/Users'
 import Companies from './features/admin/Companies'
 import Investors from './features/admin/Investors'
 import AdminDistributions from './features/admin/Distributions'
@@ -39,6 +40,7 @@ export default function App() {
         <Route path="/admin" element={<RoleGuard role="admin" />}>
           <Route element={<Layout />}>
             <Route index element={<AdminDashboard />} />
+            <Route path="users" element={<Users />} />
             <Route path="companies" element={<Companies />} />
             <Route path="investors" element={<Investors />} />
             <Route path="distributions" element={<AdminDistributions />} />

@@ -1,7 +1,6 @@
 {
   "name": "arunami-functions",
   "description": "Cloud Functions — custom-claim RBAC + (P2) server-side money validation",
-  "type": "module",
   "engines": { "node": "20" },
   "main": "lib/index.js",
   "scripts": {

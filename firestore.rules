@@ -34,13 +34,15 @@ service cloud.firestore {
     // Financials — authored by BA-PM (admin may correct).
     match /pnl/{id} { allow read: if signedIn(); allow write: if isBapm() || isAdmin(); }
 
-    // Distributions — admin creates/processes/holds; BA-PM forwards (update).
-    // P2 will move the money calculation server-side (callable), then tighten
-    // these writes to deny client-set amounts.
+    // Distributions — admin creates/holds; BA-PM forwards. The money fields
+    // (`amounts`/`netJt`) are computed & written ONLY by the processDistribution
+    // Cloud Function (admin SDK bypasses rules). Clients may change status/proofs
+    // but never the amounts — this is the P2 server-authoritative guarantee.
     match /distributions/{id} {
       allow read: if signedIn();
       allow create, delete: if isAdmin();
-      allow update: if isAdmin() || isBapm();
+      allow update: if (isAdmin() || isBapm())
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['amounts', 'netJt']);
     }
 
     // Reports — BA-PM/admin author; investors may update ONLY the `reads` map.

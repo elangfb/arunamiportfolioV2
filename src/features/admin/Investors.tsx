@@ -5,8 +5,9 @@ import { useActor } from '../shared'
 import { useCollection } from '../../data/useStore'
 import { store } from '../../data/store'
 import { capSum } from '../../data/calc'
+import { uploadFile } from '../../lib/storage'
 import { rpJt, today, uid } from '../../lib/format'
-import { Avatar, Button, Card, Field, Input, Modal, Pill, Select, StatCard, toast } from '../../components/ui'
+import { Avatar, Button, Card, Field, FileButton, Input, Modal, Pill, Select, StatCard, toast } from '../../components/ui'
 import type { Investor, KycStatus } from '../../data/types'
 
 const KYC_TONE: Record<KycStatus, 'green' | 'amber' | 'red'> = { verified: 'green', pending: 'amber', rejected: 'red' }
@@ -103,8 +104,11 @@ const DOCS = [['ktp', 'KTP / identitas'], ['npwp', 'Kartu NPWP'], ['bank', 'Reke
 
 function KycModal({ investorId, onClose, actor }: { investorId: string; onClose: () => void; actor: { name: string } }) {
   const inv = useCollection('investors').find((i) => i.id === investorId)!
-  function setDoc(key: 'ktp' | 'npwp' | 'bank') {
-    store.update('investors', investorId, { docs: { ...(inv.docs ?? {}), [key]: `${key}-${inv.id}.pdf` } })
+  async function uploadDoc(key: 'ktp' | 'npwp' | 'bank', file: File) {
+    try {
+      const res = await uploadFile(`kyc/${investorId}`, file)
+      store.update('investors', investorId, { docs: { ...(inv.docs ?? {}), [key]: { name: res.name, url: res.url } } })
+    } catch (e) { toast((e as Error).message) }
   }
   function verify() { store.update('investors', investorId, { kyc: 'verified' }); store.log({ actor: actor.name, role: 'admin', action: `Memverifikasi KYC ${inv.name}` }); toast('KYC terverifikasi'); onClose() }
   function reject() { store.update('investors', investorId, { kyc: 'rejected' }); store.log({ actor: actor.name, role: 'admin', action: `Menolak KYC ${inv.name}` }); toast('KYC ditolak'); onClose() }
@@ -123,8 +127,8 @@ function KycModal({ investorId, onClose, actor }: { investorId: string; onClose:
           const file = inv.docs?.[key]
           return (
             <div key={key} className="flex items-center gap-2 border border-gray-200 rounded-lg px-3 py-2">
-              <span className="flex-1 text-sm">{label}{file && <span className="block text-xs text-ok">✓ {file}</span>}</span>
-              <Button sm onClick={() => setDoc(key)}>{file ? 'Ganti' : 'Unggah'}</Button>
+              <span className="flex-1 text-sm">{label}{file && <a className="block text-xs text-info hover:underline" href={file.url} target="_blank" rel="noreferrer">✓ {file.name}</a>}</span>
+              <FileButton label={file ? 'Ganti' : 'Unggah'} onPick={(f) => uploadDoc(key, f)} />
             </div>
           )
         })}

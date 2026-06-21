@@ -4,7 +4,8 @@ import { useState } from 'react'
 import { Navigate } from 'react-router-dom'
 import { useCollection } from '../data/useStore'
 import { ROLE_CONFIG, ROLE_LABEL } from '../config/roles'
-import { firebaseEnabled } from '../lib/firebase'
+import { sendPasswordResetEmail } from 'firebase/auth'
+import { auth, firebaseEnabled } from '../lib/firebase'
 import { DEMO_PASSWORD, seedFirebase } from '../lib/firebaseSeed'
 import { makeSeed } from '../data/seed'
 import { useAuth } from './AuthContext'
@@ -61,13 +62,20 @@ function MockLogin() {
 
 function FirebaseLogin() {
   const { loginWithEmail, authedNoProfile } = useAuth()
-  const [email, setEmail] = useState('admin@arunami.id')
-  const [pw, setPw] = useState(DEMO_PASSWORD)
+  // Pre-fill demo credentials only in dev — never ship the shared password in prod.
+  const [email, setEmail] = useState(import.meta.env.DEV ? 'admin@arunami.id' : '')
+  const [pw, setPw] = useState(import.meta.env.DEV ? DEMO_PASSWORD : '')
   const [busy, setBusy] = useState(false)
 
   async function signIn() {
     setBusy(true)
     try { await loginWithEmail(email, pw) } catch (e) { toast('Gagal masuk: ' + (e as Error).message) } finally { setBusy(false) }
+  }
+  async function forgot() {
+    if (!email) { toast('Isi email dulu'); return }
+    if (!auth) return
+    try { await sendPasswordResetEmail(auth, email); toast('Email reset password dikirim') }
+    catch (e) { toast('Gagal: ' + (e as Error).message) }
   }
   async function seed() {
     setBusy(true)
@@ -80,6 +88,7 @@ function FirebaseLogin() {
         <Field label="Email"><Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} /></Field>
         <Field label="Password"><Input type="password" value={pw} onChange={(e) => setPw(e.target.value)} /></Field>
         <Button variant="primary" className="w-full justify-center" disabled={busy} onClick={signIn}>Masuk</Button>
+        <button className="text-xs text-info hover:underline w-full text-center" onClick={forgot}>Lupa password?</button>
         {authedNoProfile && <p className="text-xs text-warn">Akun terautentikasi tapi belum ada data. Jalankan "Seed data + akun" di bawah.</p>}
       </div>
 
